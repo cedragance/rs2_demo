@@ -35,10 +35,8 @@ public class BaseController implements Filter {
                 .setExpiration(new Date(System.currentTimeMillis() + 600000))
                 .signWith(SignatureAlgorithm.HS512,
                         password.getBytes()).compact();
-
-        String tokenString = "Bearer " + token;
-        tokenStorage.add(tokenString);
-        return tokenString;
+        tokenStorage.add(token);
+        return token;
     }
 
     @Override
