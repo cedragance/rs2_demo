@@ -2,10 +2,10 @@ package org.rs2.demo.rest;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
@@ -14,10 +14,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
-@Order(1)
 public class BaseController implements Filter {
 
-    private static Set<String> tokenStorage = Collections.synchronizedSet(new HashSet<String>());
+    private static Set<String> IGNORE_PATHS = Set.of("/user/token/*/*");
+
+    private static Set<String> TOKEN_STORAGE = Collections.synchronizedSet(new HashSet<String>());
 
     public static String getJWTToken(String username, String password) {
         List<GrantedAuthority> grantedAuthorities = AuthorityUtils
@@ -35,7 +36,7 @@ public class BaseController implements Filter {
                 .setExpiration(new Date(System.currentTimeMillis() + 600000))
                 .signWith(SignatureAlgorithm.HS512,
                         password.getBytes()).compact();
-        tokenStorage.add(token);
+        TOKEN_STORAGE.add(token);
         return token;
     }
 
@@ -45,8 +46,9 @@ public class BaseController implements Filter {
                             ServletResponse response,
                             FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
-        String contextPath = req.getContextPath();
-        if(!"".equals(contextPath)) {
+        String path = req.getRequestURI();
+        AntPathMatcher antMatchers = new AntPathMatcher(); 
+        if(!IGNORE_PATHS.stream().anyMatch(ip -> antMatchers.match(ip, path))) {
             Enumeration<String> headerNames = req.getHeaderNames();
             String token = null;
             if (headerNames != null) {
@@ -56,7 +58,7 @@ public class BaseController implements Filter {
                         token = header.split(" ")[1];
                 }
             }
-            if (token != null && tokenStorage.contains(token))
+            if (token != null && TOKEN_STORAGE.contains(token))
                 chain.doFilter(request, response);
             else
                 response.getWriter().print("Bad credentials.");
